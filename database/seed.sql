@@ -82,3 +82,4 @@ VALUES
 
 -- Goa Hotel: 1 confirmed booking
 ('HB-20261224-2E6B8', 3, 3, 'Ananya Sen', 'ananya.sen@example.com', '2026-12-24', '2026-12-28', 4, 6500.00, 26000.00, 'CONFIRMED');
+

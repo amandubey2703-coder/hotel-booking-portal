@@ -18,3 +18,4 @@ router.post('/:reference/cancel', validateCancelBooking, bookingController.cance
 router.patch('/:reference/cancel', validateCancelBooking, bookingController.cancelBooking);
 
 module.exports = router;
+

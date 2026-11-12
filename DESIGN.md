@@ -379,3 +379,4 @@ With additional development time, the following enhancements could be incorporat
 3. **Seasonal / Dynamic Pricing:** Implement rate cards that vary room prices based on weekends, holidays, or occupancy rates.
 4. **WebSocket / SSE Live Updates:** Push real-time inventory updates to the frontend as other users make reservations.
 5. **Redis Caching Layer:** Cache non-volatile hotel metadata (descriptions, amenities, images) while routing availability and write transactions to MySQL.
+

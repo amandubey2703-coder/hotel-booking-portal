@@ -185,7 +185,7 @@ export default function HotelDetails() {
               <Sparkles size={20} color="var(--accent)" />
               Hotel Amenities & Services
             </h2>
-            <div style={{ display: 'grid', gridToColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.85rem' }}>
               {(hotel.amenities_list || []).map((amenity, idx) => (
                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', padding: '0.65rem 0.9rem', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
                   <CheckCircle2 size={16} color="var(--primary)" />

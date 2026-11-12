@@ -88,3 +88,4 @@ describe('Simultaneous Booking Concurrency Protection', () => {
     expect(finalAvail.availableRooms).toBe(0);
   });
 });
+

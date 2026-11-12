@@ -75,3 +75,4 @@ CREATE TABLE bookings (
     INDEX idx_bookings_availability (hotel_id, room_type_id, status, check_in_date, check_out_date),
     INDEX idx_bookings_retrieval (booking_reference, guest_email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

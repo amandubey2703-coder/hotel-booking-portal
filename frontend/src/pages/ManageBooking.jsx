@@ -87,7 +87,8 @@ export default function ManageBooking() {
       setCancelling(true);
       setError(null);
       const res = await cancelBooking(booking.bookingReference, booking.guestEmail);
-      setBooking(res.data);
+      // cancelBooking returns the full response; .data contains the updated booking object
+      setBooking(res.data || res);
       setCancelSuccessMsg(
         'Your booking has been cancelled successfully. Your previously reserved room capacity is now released.'
       );

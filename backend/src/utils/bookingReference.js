@@ -27,3 +27,4 @@ function generateBookingReference(date = new Date()) {
 module.exports = {
   generateBookingReference,
 };
+

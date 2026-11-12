@@ -381,3 +381,4 @@ Visual captures of the key flows are preserved in the `screenshots/` directory:
 ## 17. AI Assistance Disclosure
 
 In accordance with the assignment guidelines, AI assistance (Gemini / Antigravity Agent) was utilized for boilerplate generation, test case authoring, and documentation refinement. All architectural decisions, transactional concurrency models, database schemas, and application logic were verified, tested, and executed end-to-end.
+

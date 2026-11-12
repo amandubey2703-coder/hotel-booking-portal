@@ -145,3 +145,4 @@ module.exports = {
   validateRetrieveBooking,
   validateCancelBooking,
 };
+

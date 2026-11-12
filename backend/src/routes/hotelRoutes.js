@@ -13,3 +13,4 @@ router.get('/:id', validateHotelId, hotelController.getHotelById);
 router.get('/:id/availability', validateHotelId, validateAvailabilityQuery, hotelController.getAvailability);
 
 module.exports = router;
+

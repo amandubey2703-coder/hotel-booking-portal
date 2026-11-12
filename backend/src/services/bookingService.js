@@ -2,154 +2,348 @@ const { pool } = require('../config/database');
 const hotelRepository = require('../repositories/hotelRepository');
 const bookingRepository = require('../repositories/bookingRepository');
 const { AppError } = require('../middleware/errorHandler');
-const { calculateNights, calculatePeakNightlyOccupancy } = require('../utils/dateUtils');
+const {
+  calculateNights,
+  calculatePeakNightlyOccupancy,
+} = require('../utils/dateUtils');
 const { generateBookingReference } = require('../utils/bookingReference');
 
 class BookingService {
   /**
-   * Creates a new booking using an ACID MySQL transaction with InnoDB row-level locking.
-   * Protects against simultaneous overbooking of the last available room.
-   * 
-   * @param {Object} bookingInput
-   * @param {number} bookingInput.hotelId
-   * @param {string} bookingInput.guestName
-   * @param {string} bookingInput.guestEmail
-   * @param {string} bookingInput.checkIn
-   * @param {string} bookingInput.checkOut
-   * @returns {Promise<Object>} Created booking record with full details
+   * Create a new hotel booking.
+   *
+   * total_capacity = TOTAL rooms in the room type.
+   * It is never decreased when a booking is created.
+   *
+   * Available rooms are calculated as:
+   *
+   *   totalCapacity - peakOccupancy
+   *
+   * Only CONFIRMED bookings are counted.
+   * CANCELLED bookings do not consume capacity.
    */
-  async createBooking({ hotelId, guestName, guestEmail, checkIn, checkOut }) {
+  async createBooking({
+    hotelId,
+    guestName,
+    guestEmail,
+    checkIn,
+    checkOut,
+  }) {
     const connection = await pool.getConnection();
 
     try {
-      // 1. Configure transaction isolation and begin atomic database transaction
-      await connection.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED;');
+      /*
+       * Start transaction.
+       */
+      await connection.query(
+        'SET TRANSACTION ISOLATION LEVEL READ COMMITTED'
+      );
+
       await connection.beginTransaction();
 
-      // 2. Validate hotel existence
-      const hotel = await hotelRepository.findById(hotelId);
-      if (!hotel) {
-        throw new AppError(`Hotel with ID ${hotelId} not found.`, 404, 'HOTEL_NOT_FOUND');
-      }
-
-      // 3. Retrieve room type and acquire exclusive pessimistic row lock (FOR UPDATE)
-      // Any concurrent booking attempt for this room type must wait until this transaction completes.
-      const roomTypeBasic = await hotelRepository.findRoomTypeByHotelId(hotelId, connection);
-      if (!roomTypeBasic) {
-        throw new AppError(`No room configuration found for hotel ID ${hotelId}.`, 404, 'ROOM_NOT_FOUND');
-      }
-
-      const roomType = await hotelRepository.findRoomTypeByIdForUpdate(roomTypeBasic.id, connection);
-      if (!roomType) {
-        throw new AppError(`Room configuration lock could not be acquired.`, 404, 'ROOM_NOT_FOUND');
-      }
-
-      // 4. Query all overlapping confirmed bookings under active transaction
-      // Overlap condition: check_in_date < checkOut AND check_out_date > checkIn
-      const overlappingBookings = await bookingRepository.getOverlappingConfirmedBookings(
+      /*
+       * ------------------------------------------------------------
+       * 1. Validate hotel
+       * ------------------------------------------------------------
+       */
+      const hotel = await hotelRepository.findById(
         hotelId,
-        roomType.id,
-        checkIn,
-        checkOut,
         connection
       );
 
-      // 5. Calculate occupied capacity and remaining availability
-      const peakOccupancy = calculatePeakNightlyOccupancy(overlappingBookings, checkIn, checkOut);
-      const availableCapacity = roomType.total_capacity - peakOccupancy;
+      if (!hotel) {
+        throw new AppError(
+          `Hotel with ID ${hotelId} not found.`,
+          404,
+          'HOTEL_NOT_FOUND'
+        );
+      }
 
-      // 6. Overbooking prevention: If capacity <= 0, abort immediately with 409 Conflict
+      /*
+       * ------------------------------------------------------------
+       * 2. Find room type for this hotel
+       * ------------------------------------------------------------
+       */
+      const roomTypeBasic =
+        await hotelRepository.findRoomTypeByHotelId(
+          hotelId,
+          connection
+        );
+
+      if (!roomTypeBasic) {
+        throw new AppError(
+          `No room configuration found for hotel ID ${hotelId}.`,
+          404,
+          'ROOM_NOT_FOUND'
+        );
+      }
+
+      /*
+       * ------------------------------------------------------------
+       * 3. Lock the room type row
+       *
+       * FOR UPDATE prevents two concurrent transactions from
+       * checking the same capacity at the same time.
+       * ------------------------------------------------------------
+       */
+      const roomType =
+        await hotelRepository.findRoomTypeByIdForUpdate(
+          roomTypeBasic.id,
+          connection
+        );
+
+      if (!roomType) {
+        throw new AppError(
+          'Room configuration could not be found.',
+          404,
+          'ROOM_NOT_FOUND'
+        );
+      }
+
+      const totalCapacity = Number(
+        roomType.total_capacity
+      );
+
+      /*
+       * ------------------------------------------------------------
+       * 4. Find overlapping CONFIRMED bookings
+       * ------------------------------------------------------------
+       */
+      const overlappingBookings =
+        await bookingRepository.getOverlappingConfirmedBookings(
+          hotelId,
+          roomType.id,
+          checkIn,
+          checkOut,
+          connection
+        );
+
+      /*
+       * ------------------------------------------------------------
+       * 5. Calculate maximum simultaneous occupancy
+       * ------------------------------------------------------------
+       */
+      const peakOccupancy =
+        calculatePeakNightlyOccupancy(
+          overlappingBookings,
+          checkIn,
+          checkOut
+        );
+
+      const availableCapacity =
+        totalCapacity - peakOccupancy;
+
+      /*
+       * ------------------------------------------------------------
+       * 6. Prevent overbooking
+       * ------------------------------------------------------------
+       */
       if (availableCapacity <= 0) {
         throw new AppError(
-          'Sorry, the requested room is no longer available for the selected dates. Please choose different dates.',
+          'No rooms are available for the selected dates. Please choose different dates.',
           409,
           'ROOM_UNAVAILABLE'
         );
       }
 
-      // 7. Authoritative backend calculation of nights and total amount
-      // Never trust any client-submitted total amount!
-      const nights = calculateNights(checkIn, checkOut);
-      const pricePerNight = Number(roomType.price_per_night);
-      const totalAmount = nights * pricePerNight;
+      /*
+       * ------------------------------------------------------------
+       * 7. Calculate nights and price
+       *
+       * These values are calculated by the backend.
+       * Never trust a total amount sent by React.
+       * ------------------------------------------------------------
+       */
+      const nights = calculateNights(
+        checkIn,
+        checkOut
+      );
 
-      // 8. Generate unique booking reference (e.g. HB-20261112-XXXXX)
-      let bookingReference = generateBookingReference();
-      // Verify collision resistance (extremely improbable, but guaranteed safe)
-      let existingBooking = await bookingRepository.findByReference(bookingReference, connection);
+      const pricePerNight = Number(
+        roomType.price_per_night
+      );
+
+      const totalAmount =
+        nights * pricePerNight;
+
+      /*
+       * ------------------------------------------------------------
+       * 8. Generate unique booking reference
+       * ------------------------------------------------------------
+       */
+      let bookingReference =
+        generateBookingReference();
+
+      let existingBooking =
+        await bookingRepository.findByReference(
+          bookingReference,
+          connection
+        );
+
       let attempts = 0;
+
       while (existingBooking && attempts < 5) {
-        bookingReference = generateBookingReference();
-        existingBooking = await bookingRepository.findByReference(bookingReference, connection);
+        bookingReference =
+          generateBookingReference();
+
+        existingBooking =
+          await bookingRepository.findByReference(
+            bookingReference,
+            connection
+          );
+
         attempts++;
       }
 
-      // 9. Insert booking record into database
+      if (existingBooking) {
+        throw new AppError(
+          'Unable to generate a unique booking reference. Please try again.',
+          500,
+          'BOOKING_REFERENCE_GENERATION_FAILED'
+        );
+      }
+
+      /*
+       * ------------------------------------------------------------
+       * 9. Create booking
+       * ------------------------------------------------------------
+       */
       const bookingData = {
         bookingReference,
         hotelId,
         roomTypeId: roomType.id,
+
         guestName,
         guestEmail,
+
         checkInDate: checkIn,
         checkOutDate: checkOut,
+
         numberOfNights: nights,
+
         pricePerNight,
         totalAmount,
+
         status: 'CONFIRMED',
       };
 
-      const bookingId = await bookingRepository.createBooking(bookingData, connection);
+      const bookingId =
+        await bookingRepository.createBooking(
+          bookingData,
+          connection
+        );
 
-      // 10. Commit the transaction
+      /*
+       * ------------------------------------------------------------
+       * 10. Recalculate availability after the booking
+       *
+       * This is what gives the frontend the updated room count.
+       * ------------------------------------------------------------
+       */
+      const updatedOverlappingBookings =
+        await bookingRepository.getOverlappingConfirmedBookings(
+          hotelId,
+          roomType.id,
+          checkIn,
+          checkOut,
+          connection
+        );
+
+      const updatedPeakOccupancy =
+        calculatePeakNightlyOccupancy(
+          updatedOverlappingBookings,
+          checkIn,
+          checkOut
+        );
+
+      const updatedAvailableCapacity =
+        totalCapacity - updatedPeakOccupancy;
+
+      /*
+       * ------------------------------------------------------------
+       * 11. Commit transaction
+       * ------------------------------------------------------------
+       */
       await connection.commit();
 
-      // Return complete booking details
+      /*
+       * ------------------------------------------------------------
+       * 12. Return booking + updated availability
+       * ------------------------------------------------------------
+       */
       return {
         id: bookingId,
+
         bookingReference,
+
         hotelId,
         hotelName: hotel.name,
         hotelLocation: hotel.location,
+
         roomTypeId: roomType.id,
         roomType: roomType.name,
+
         guestName,
         guestEmail,
+
         checkInDate: checkIn,
         checkOutDate: checkOut,
+
         numberOfNights: nights,
+
         pricePerNight,
         totalAmount,
+
         status: 'CONFIRMED',
+
+        // Room availability
+        totalCapacity,
+        bookedCapacity: updatedPeakOccupancy,
+        availableCapacity: updatedAvailableCapacity,
+
         message: 'Booking successfully confirmed!',
       };
-    } catch (err) {
-      // Rollback on any failure to ensure database consistency
+    } catch (error) {
+      /*
+       * Roll back everything if anything fails.
+       */
       await connection.rollback();
-      throw err;
+
+      throw error;
     } finally {
-      // Always release connection back to pool
+      /*
+       * Always release database connection.
+       */
       connection.release();
     }
   }
 
   /**
-   * Retrieves a booking using booking reference AND guest email.
-   * Security constraint: Never retrieve using reference alone!
-   * 
-   * @param {string} reference 
-   * @param {string} email 
-   * @returns {Promise<Object>}
+   * Retrieve booking using:
+   *
+   * booking reference + guest email
    */
   async getBooking(reference, email) {
-    const booking = await bookingRepository.findByReference(reference);
+    const booking =
+      await bookingRepository.findByReference(
+        reference
+      );
 
     if (!booking) {
-      throw new AppError('No booking found with the provided reference.', 404, 'BOOKING_NOT_FOUND');
+      throw new AppError(
+        'No booking found with the provided reference.',
+        404,
+        'BOOKING_NOT_FOUND'
+      );
     }
 
-    // Security check: verify email matches
-    if (booking.guest_email.toLowerCase() !== email.toLowerCase()) {
+    /*
+     * Verify email.
+     */
+    if (
+      booking.guest_email.toLowerCase() !==
+      email.toLowerCase()
+    ) {
       throw new AppError(
         'The provided email address does not match this booking reference.',
         403,
@@ -159,71 +353,174 @@ class BookingService {
 
     return {
       id: booking.id,
-      bookingReference: booking.booking_reference,
-      hotelId: booking.hotel_id,
-      hotelName: booking.hotel_name,
-      hotelLocation: booking.hotel_location,
-      hotelImage: booking.hotel_image,
-      roomTypeId: booking.room_type_id,
-      roomType: booking.room_type_name,
-      guestName: booking.guest_name,
-      guestEmail: booking.guest_email,
-      checkInDate: typeof booking.check_in_date === 'string' 
-        ? booking.check_in_date.substring(0, 10) 
-        : booking.check_in_date.toISOString().substring(0, 10),
-      checkOutDate: typeof booking.check_out_date === 'string' 
-        ? booking.check_out_date.substring(0, 10) 
-        : booking.check_out_date.toISOString().substring(0, 10),
-      numberOfNights: booking.number_of_nights,
-      pricePerNight: Number(booking.price_per_night),
-      totalAmount: Number(booking.total_amount),
-      status: booking.status,
-      createdAt: booking.created_at,
-      updatedAt: booking.updated_at,
+
+      bookingReference:
+        booking.booking_reference,
+
+      hotelId:
+        booking.hotel_id,
+
+      hotelName:
+        booking.hotel_name,
+
+      hotelLocation:
+        booking.hotel_location,
+
+      hotelImage:
+        booking.hotel_image,
+
+      roomTypeId:
+        booking.room_type_id,
+
+      roomType:
+        booking.room_type_name,
+
+      guestName:
+        booking.guest_name,
+
+      guestEmail:
+        booking.guest_email,
+
+      checkInDate:
+        formatDate(booking.check_in_date),
+
+      checkOutDate:
+        formatDate(booking.check_out_date),
+
+      numberOfNights:
+        Number(booking.number_of_nights),
+
+      pricePerNight:
+        Number(booking.price_per_night),
+
+      totalAmount:
+        Number(booking.total_amount),
+
+      status:
+        booking.status,
+
+      createdAt:
+        booking.created_at,
+
+      updatedAt:
+        booking.updated_at,
     };
   }
 
   /**
-   * Cancels an existing booking after verifying the associated email.
-   * Updates status to CANCELLED and immediately releases reserved capacity.
-   * 
-   * @param {string} reference 
-   * @param {string} email 
-   * @returns {Promise<Object>}
+   * Cancel booking.
+   *
+   * We do NOT change room_types.total_capacity.
+   *
+   * We only change the booking status to CANCELLED.
+   * Availability queries ignore CANCELLED bookings.
    */
   async cancelBooking(reference, email) {
-    const booking = await bookingRepository.findByReference(reference);
+    const connection =
+      await pool.getConnection();
 
-    if (!booking) {
-      throw new AppError('No booking found with the provided reference.', 404, 'BOOKING_NOT_FOUND');
-    }
+    try {
+      await connection.beginTransaction();
 
-    if (booking.guest_email.toLowerCase() !== email.toLowerCase()) {
-      throw new AppError(
-        'The provided email address does not match this booking reference.',
-        403,
-        'BOOKING_EMAIL_MISMATCH'
+      /*
+       * Get booking using transaction connection.
+       */
+      const booking =
+        await bookingRepository.findByReference(
+          reference,
+          connection
+        );
+
+      if (!booking) {
+        throw new AppError(
+          'No booking found with the provided reference.',
+          404,
+          'BOOKING_NOT_FOUND'
+        );
+      }
+
+      /*
+       * Verify email.
+       */
+      if (
+        booking.guest_email.toLowerCase() !==
+        email.toLowerCase()
+      ) {
+        throw new AppError(
+          'The provided email address does not match this booking reference.',
+          403,
+          'BOOKING_EMAIL_MISMATCH'
+        );
+      }
+
+      /*
+       * Prevent cancelling twice.
+       */
+      if (booking.status === 'CANCELLED') {
+        throw new AppError(
+          'This booking is already cancelled.',
+          400,
+          'BOOKING_ALREADY_CANCELLED'
+        );
+      }
+
+      /*
+       * Change CONFIRMED -> CANCELLED.
+       */
+      await bookingRepository.updateStatus(
+        reference,
+        'CANCELLED',
+        connection
       );
+
+      await connection.commit();
+
+      /*
+       * Once cancelled, this booking is no longer counted
+       * by getOverlappingConfirmedBookings().
+       */
+      const updatedBooking =
+        await this.getBooking(
+          reference,
+          email
+        );
+
+      return {
+        success: true,
+
+        message:
+          'Booking cancelled successfully. The room is now available for other bookings.',
+
+        booking: updatedBooking,
+      };
+    } catch (error) {
+      await connection.rollback();
+
+      throw error;
+    } finally {
+      connection.release();
     }
-
-    if (booking.status === 'CANCELLED') {
-      throw new AppError(
-        'This booking is already cancelled.',
-        400,
-        'BOOKING_ALREADY_CANCELLED'
-      );
-    }
-
-    await bookingRepository.updateStatus(reference, 'CANCELLED');
-
-    const updatedBooking = await this.getBooking(reference, email);
-
-    return {
-      success: true,
-      message: 'Booking cancelled successfully. Reserved room capacity has been released.',
-      booking: updatedBooking,
-    };
   }
+}
+
+/**
+ * Safely convert MySQL DATE/DATETIME values
+ * into YYYY-MM-DD.
+ */
+function formatDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return value.substring(0, 10);
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().substring(0, 10);
+  }
+
+  return String(value).substring(0, 10);
 }
 
 module.exports = new BookingService();

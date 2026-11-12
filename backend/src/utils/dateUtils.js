@@ -142,3 +142,4 @@ module.exports = {
   datesOverlap,
   calculatePeakNightlyOccupancy,
 };
+

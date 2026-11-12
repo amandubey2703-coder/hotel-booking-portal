@@ -122,3 +122,4 @@ export async function cancelBooking(reference, email) {
   });
   return response;
 }
+

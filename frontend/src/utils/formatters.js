@@ -75,3 +75,4 @@ export function calculateNights(checkIn, checkOut) {
   const diff = end - start;
   return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)));
 }
+

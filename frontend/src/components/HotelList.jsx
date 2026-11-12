@@ -62,3 +62,4 @@ export default function HotelList({ hotels, checkIn, checkOut, onResetSearch }) 
     </div>
   );
 }
+

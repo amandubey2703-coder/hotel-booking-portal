@@ -24,3 +24,4 @@ export default function ErrorMessage({ message, onRetry }) {
     </div>
   );
 }
+

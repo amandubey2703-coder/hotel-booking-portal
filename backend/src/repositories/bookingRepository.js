@@ -2,21 +2,34 @@ const { pool } = require('../config/database');
 
 class BookingRepository {
   /**
-   * Retrieves all confirmed bookings that overlap with requested date window.
-   * Condition: check_in_date < requested_check_out AND check_out_date > requested_check_in
-   * Only active CONFIRMED bookings are included; CANCELLED bookings are excluded.
-   * If run within a transaction, uses FOR UPDATE (locking read) to prevent stale MVCC snapshot reads.
-   * 
-   * @param {number} hotelId 
-   * @param {number} roomTypeId 
-   * @param {string} checkIn 
-   * @param {string} checkOut 
-   * @param {Object} [connection] Optional transaction connection
+   * Retrieves all confirmed bookings that overlap with the requested date range.
+   *
+   * Overlap rule:
+   *   existing check-in  < requested check-out
+   *   AND
+   *   existing check-out > requested check-in
+   *
+   * CANCELLED bookings are ignored.
+   *
+   * When called with a transaction connection, FOR UPDATE is used so the
+   * booking rows read by the transaction are locked until commit/rollback.
+   *
+   * @param {number} hotelId
+   * @param {number} roomTypeId
+   * @param {string} checkIn
+   * @param {string} checkOut
+   * @param {Object} [connection=pool]
    * @returns {Promise<Array>}
    */
-  async getOverlappingConfirmedBookings(hotelId, roomTypeId, checkIn, checkOut, connection = pool) {
+  async getOverlappingConfirmedBookings(
+    hotelId,
+    roomTypeId,
+    checkIn,
+    checkOut,
+    connection = pool
+  ) {
     let query = `
-      SELECT 
+      SELECT
         id,
         booking_reference,
         check_in_date,
@@ -31,22 +44,27 @@ class BookingRepository {
       ORDER BY check_in_date ASC
     `;
 
-    // In a transaction, perform a locking read so MySQL reads the latest committed state
+    // Lock matching booking rows when running inside a transaction.
     if (connection !== pool) {
-      query += ` FOR UPDATE;`;
-    } else {
-      query += `;`;
+      query += ` FOR UPDATE`;
     }
 
-    const [rows] = await connection.query(query, [hotelId, roomTypeId, checkOut, checkIn]);
+    const [rows] = await connection.query(query, [
+      hotelId,
+      roomTypeId,
+      checkOut,
+      checkIn
+    ]);
+
     return rows;
   }
 
   /**
-   * Inserts a new booking record.
+   * Inserts a new booking.
+   *
    * @param {Object} bookingData
-   * @param {Object} [connection] Optional transaction connection
-   * @returns {Promise<number>} Inserted row ID
+   * @param {Object} [connection=pool]
+   * @returns {Promise<number>}
    */
   async createBooking(bookingData, connection = pool) {
     const query = `
@@ -62,8 +80,10 @@ class BookingRepository {
         price_per_night,
         total_amount,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+
     const values = [
       bookingData.bookingReference,
       bookingData.hotelId,
@@ -75,22 +95,24 @@ class BookingRepository {
       bookingData.numberOfNights,
       bookingData.pricePerNight,
       bookingData.totalAmount,
-      bookingData.status || 'CONFIRMED',
+      bookingData.status || 'CONFIRMED'
     ];
 
     const [result] = await connection.query(query, values);
+
     return result.insertId;
   }
 
   /**
-   * Finds a booking by its unique booking reference.
-   * @param {string} reference 
-   * @param {Object} [connection]
+   * Finds a booking by booking reference.
+   *
+   * @param {string} reference
+   * @param {Object} [connection=pool]
    * @returns {Promise<Object|null>}
    */
   async findByReference(reference, connection = pool) {
     const query = `
-      SELECT 
+      SELECT
         b.id,
         b.booking_reference,
         b.hotel_id,
@@ -105,29 +127,38 @@ class BookingRepository {
         b.status,
         b.created_at,
         b.updated_at,
+
         h.name AS hotel_name,
         h.location AS hotel_location,
         h.image_url AS hotel_image,
+
         r.name AS room_type_name
       FROM bookings b
-      JOIN hotels h ON b.hotel_id = h.id
-      JOIN room_types r ON b.room_type_id = r.id
-      WHERE b.booking_reference = ?;
+      JOIN hotels h
+        ON b.hotel_id = h.id
+      JOIN room_types r
+        ON b.room_type_id = r.id
+      WHERE b.booking_reference = ?
+      LIMIT 1
     `;
+
     const [rows] = await connection.query(query, [reference]);
+
     return rows.length > 0 ? rows[0] : null;
   }
 
   /**
-   * Finds a booking by both reference and guest email.
-   * Ensures email verification before retrieving booking details.
-   * @param {string} reference 
-   * @param {string} email 
+   * Finds a booking using both booking reference and email.
+   *
+   * Email comparison is case-insensitive.
+   *
+   * @param {string} reference
+   * @param {string} email
    * @returns {Promise<Object|null>}
    */
   async findByReferenceAndEmail(reference, email) {
     const query = `
-      SELECT 
+      SELECT
         b.id,
         b.booking_reference,
         b.hotel_id,
@@ -142,33 +173,54 @@ class BookingRepository {
         b.status,
         b.created_at,
         b.updated_at,
+
         h.name AS hotel_name,
         h.location AS hotel_location,
         h.image_url AS hotel_image,
+
         r.name AS room_type_name
       FROM bookings b
-      JOIN hotels h ON b.hotel_id = h.id
-      JOIN room_types r ON b.room_type_id = r.id
-      WHERE b.booking_reference = ? AND LOWER(b.guest_email) = LOWER(?);
+      JOIN hotels h
+        ON b.hotel_id = h.id
+      JOIN room_types r
+        ON b.room_type_id = r.id
+      WHERE b.booking_reference = ?
+        AND LOWER(b.guest_email) = LOWER(?)
+      LIMIT 1
     `;
-    const [rows] = await pool.query(query, [reference, email]);
+
+    const [rows] = await pool.query(query, [
+      reference,
+      email
+    ]);
+
     return rows.length > 0 ? rows[0] : null;
   }
 
   /**
-   * Updates booking status (e.g. CANCELLED).
-   * @param {string} reference 
-   * @param {string} status 
-   * @param {Object} [connection] Optional transaction connection
+   * Updates booking status.
+   *
+   * Used for cancellation.
+   *
+   * @param {string} reference
+   * @param {string} status
+   * @param {Object} [connection=pool]
    * @returns {Promise<boolean>}
    */
   async updateStatus(reference, status, connection = pool) {
     const query = `
       UPDATE bookings
-      SET status = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE booking_reference = ?;
+      SET
+        status = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE booking_reference = ?
     `;
-    const [result] = await connection.query(query, [status, reference]);
+
+    const [result] = await connection.query(query, [
+      status,
+      reference
+    ]);
+
     return result.affectedRows > 0;
   }
 }

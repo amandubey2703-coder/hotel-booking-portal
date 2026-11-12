@@ -160,3 +160,4 @@ class HotelService {
 }
 
 module.exports = new HotelService();
+
