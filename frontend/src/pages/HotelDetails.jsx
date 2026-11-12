@@ -131,16 +131,17 @@ export default function HotelDetails() {
         </Link>
       </div>
 
-      <div className="hotel-details-grid">
-        {/* Left Column: Photos & Hotel Overview */}
-        <div>
-          <div className="details-gallery">
-            <img
-              src={hotel.image_url || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'}
-              alt={hotel.name}
-            />
-          </div>
+      {/* Horizontal Widescreen Photo Banner */}
+      <div className="details-gallery">
+        <img
+          src={hotel.image_url || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80'}
+          alt={hotel.name}
+        />
+      </div>
 
+      <div className="hotel-details-grid">
+        {/* Left Column: Hotel Overview */}
+        <div>
           <div className="hotel-info-section">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
@@ -180,14 +181,14 @@ export default function HotelDetails() {
               </p>
             </div>
 
-            {/* Amenities Section */}
+            {/* Amenities Section - Horizontal Badges */}
             <h2 className="section-title">
               <Sparkles size={20} color="var(--accent)" />
               Hotel Amenities & Services
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.85rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem' }}>
               {(hotel.amenities_list || []).map((amenity, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', padding: '0.65rem 0.9rem', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                <div key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', background: '#f1f5f9', padding: '0.55rem 0.95rem', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
                   <CheckCircle2 size={16} color="var(--primary)" />
                   <span>{amenity}</span>
                 </div>
