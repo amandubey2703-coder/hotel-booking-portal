@@ -12,7 +12,7 @@ export default function Navbar() {
           <div className="nav-brand-logo">
             <Building2 size={22} />
           </div>
-          <span>LuxeStay</span>
+          <span>StaySphere</span>
         </Link>
 
         <nav className="nav-links">
