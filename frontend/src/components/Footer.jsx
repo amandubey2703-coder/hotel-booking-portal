@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="footer-content">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#fff', fontWeight: 700, fontSize: '1.2rem' }}>
           <Building2 size={24} color="#3b82f6" />
-          <span>LuxeStay Portal</span>
+          <span>StaySphere Portal</span>
         </div>
         <p style={{ maxWidth: 500, fontSize: '0.88rem' }}>
           Full-Stack Hotel Booking Application built with React.js, Node.js, Express, and MySQL. Featuring atomic transaction concurrency protection and flexible date discovery.
