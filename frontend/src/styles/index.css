@@ -524,7 +524,7 @@ input, select, textarea {
 
 .hotel-details-grid {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 1fr;
   gap: 2.5rem;
   align-items: start;
 }
@@ -811,7 +811,7 @@ input, select, textarea {
 /* Responsive Breakpoints */
 @media (max-width: 1024px) {
   .hotel-details-grid {
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
