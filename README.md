@@ -34,8 +34,8 @@ The **Hotel Booking Portal** is an interview-grade full-stack web application de
 
 | Layer | Technologies |
 |---|---|
-| **Frontend** | React 18, React Router DOM 6, Vite, Lucide Icons, Modern CSS Design System |
-| **Backend** | Node.js, Express.js, REST API, `mysql2/promise`, dotenv, cors |
+| **Frontend** | React 18,Vite, Lucide Icons, Modern CSS Design System |
+| **Backend** | Node.js, Express.js, REST API, dotenv, cors |
 | **Database** | MySQL 8.0+ (InnoDB engine, foreign keys, compound indexes, ACID transactions) |
 | **Testing** | Jest, Supertest |
 | **Tooling** | Puppeteer Core (headless screenshot automation), Git |
