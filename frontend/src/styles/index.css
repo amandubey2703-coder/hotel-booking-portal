@@ -524,7 +524,7 @@ input, select, textarea {
 
 .hotel-details-grid {
   display: grid;
-  grid-template-columns: 1.8fr 1.2fr;
+  grid-template-columns: 1fr 380px;
   gap: 2.5rem;
   align-items: start;
 }
@@ -532,7 +532,7 @@ input, select, textarea {
 .details-gallery {
   border-radius: var(--radius-lg);
   overflow: hidden;
-  height: 380px;
+  height: 450px;
   margin-bottom: 2rem;
   box-shadow: var(--shadow-lg);
 }
@@ -809,9 +809,18 @@ input, select, textarea {
 }
 
 /* Responsive Breakpoints */
+@media (max-width: 1024px) {
+  .hotel-details-grid {
+    grid-template-columns: 1fr 340px;
+  }
+}
+
 @media (max-width: 900px) {
   .hotel-details-grid {
     grid-template-columns: 1fr;
+  }
+  .booking-card {
+    position: static;
   }
   .search-form {
     grid-template-columns: 1fr 1fr;
