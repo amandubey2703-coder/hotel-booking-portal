@@ -343,8 +343,15 @@ In real-world hotel booking systems, encountering a "Sold Out" message without a
 
 ---
 
-## 14. Screenshots
+## 14. Project Demo & Screenshots
 
+### 🎥 Video Walkthrough
+[![Watch Demo Video](https://img.shields.io/badge/Demo%20Video-Watch%20Walkthrough-red?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/file/d/1KmG1SVMCAmlD8U-gJi-oA4gA40JGmyjX/view?usp=drive_link)
+
+- 🔗 **Direct Demo Link:** [Watch Google Drive Walkthrough](https://drive.google.com/file/d/1KmG1SVMCAmlD8U-gJi-oA4gA40JGmyjX/view?usp=drive_link)
+- 📁 **Demo Folder:** [`project-demo/`](./project-demo/) — Dedicated directory with full walkthrough breakdown.
+
+### 📸 Visual Flow Screenshots
 Visual captures of the key flows are preserved in the `screenshots/` directory:
 - `01-hotel-search-home.png`: Home page with destination search and hotel cards.
 - `02-hotel-search-filtered.png`: Filtered search results for Goa.
