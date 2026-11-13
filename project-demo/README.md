@@ -5,7 +5,7 @@ Welcome to the project demo section for the **Hotel Booking Portal** (`StaySpher
 ---
 
 
-🔗 Video Link:**  
+🔗 Video Link:
 👉 **[https://drive.google.com/file/d/1KmG1SVMCAmlD8U-gJi-oA4gA40JGmyjX/view?usp=drive_link](https://drive.google.com/file/d/1KmG1SVMCAmlD8U-gJi-oA4gA40JGmyjX/view?usp=drive_link)**
 
 ---
