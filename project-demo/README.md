@@ -4,13 +4,8 @@ Welcome to the project demo section for the **Hotel Booking Portal** (`StaySpher
 
 ---
 
-## 📹 Full Video Walkthrough
 
-Click the link below to watch the live demo video recording of the application:
-
-[![Watch Demo Video](https://img.shields.io/badge/Demo%20Video-Watch%20Walkthrough-red?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/file/d/1KmG1SVMCAmlD8U-gJi-oA4gA40JGmyjX/view?usp=drive_link)
-
-🔗 **Direct Video Link:**  
+🔗 Video Link:**  
 👉 **[https://drive.google.com/file/d/1KmG1SVMCAmlD8U-gJi-oA4gA40JGmyjX/view?usp=drive_link](https://drive.google.com/file/d/1KmG1SVMCAmlD8U-gJi-oA4gA40JGmyjX/view?usp=drive_link)**
 
 ---
