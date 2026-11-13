@@ -2,8 +2,7 @@
  * Centralized API Service for Hotel Booking Portal
  * Handles all HTTP requests, standardizes error responses, and supports environment configuration.
  */
-
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const BASE_URL = 'http://localhost:5000/api';
 
 /**
  * Generic request helper with JSON parsing and standardized error handling.
